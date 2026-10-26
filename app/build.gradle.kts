@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.taskmanager"
+    namespace = "com.example.lma"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.taskmanager"
+        applicationId = "com.example.lma"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
@@ -53,4 +53,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 }
