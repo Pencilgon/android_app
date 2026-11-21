@@ -3,8 +3,10 @@ package com.example.lma.ui.submit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,12 +14,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lma.model.MediaCategory
 import com.example.lma.viewmodel.ArchiveViewModel
 
@@ -32,210 +34,305 @@ import com.example.lma.viewmodel.ArchiveViewModel
 fun SubmitCaseScreen(
     viewModel: ArchiveViewModel,
     onBack: () -> Unit,
-    onSubmitted: () -> Unit
+    onSubmitted: () -> Unit,
+    caseId: Int? = null
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var title by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    var selectedCategory by rememberSaveable {
-        mutableStateOf(MediaCategory.OTHER.name)
+    val existingCase = caseId?.let {
+        viewModel.getCaseById(it)
     }
-    var yearText by rememberSaveable { mutableStateOf("") }
-    var sourceUrl by rememberSaveable { mutableStateOf("") }
-    var categoryMenuExpanded by remember { mutableStateOf(false) }
-    var validationError by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val category = MediaCategory.valueOf(selectedCategory)
+    var title by rememberSaveable(caseId) {
+        mutableStateOf(existingCase?.title ?: "")
+    }
 
-    Scaffold { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            TextButton(onClick = onBack) {
-                Text("← Back")
+    var description by rememberSaveable(caseId) {
+        mutableStateOf(existingCase?.description ?: "")
+    }
+
+    var selectedCategory by rememberSaveable(caseId) {
+        mutableStateOf(
+            existingCase?.category ?: MediaCategory.OTHER
+        )
+    }
+
+    var year by rememberSaveable(caseId) {
+        mutableStateOf(existingCase?.lastKnownYear?.toString() ?: "")
+    }
+
+    var sourceUrl by rememberSaveable(caseId) {
+        mutableStateOf(existingCase?.sourceUrl ?: "")
+    }
+
+    var categoryMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    var titleError by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var descriptionError by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var yearError by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var urlError by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(existingCase?.id) {
+        if (existingCase != null) {
+            title = existingCase.title
+            description = existingCase.description
+            selectedCategory = existingCase.category
+            year = existingCase.lastKnownYear?.toString() ?: ""
+            sourceUrl = existingCase.sourceUrl ?: ""
+        }
+    }
+
+    LaunchedEffect(uiState.saveCompleted) {
+        if (uiState.saveCompleted) {
+            viewModel.clearSaveCompleted()
+            onSubmitted()
+        }
+    }
+
+    val isEditing = caseId != null
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = if (isEditing) {
+                "Edit Media Case"
+            } else {
+                "Submit a Lost Media Case"
+            },
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Text(
+            text = if (isEditing) {
+                "Update the information about this lost media."
+            } else {
+                "Help the community document lost media."
+            },
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = {
+                title = it
+                titleError = false
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = {
+                Text("Title")
+            },
+            placeholder = {
+                Text("Enter the media title")
+            },
+            isError = titleError,
+            supportingText = {
+                if (titleError) {
+                    Text("Title is required.")
+                }
+            },
+            singleLine = true
+        )
+
+        OutlinedTextField(
+            value = description,
+            onValueChange = {
+                description = it
+                descriptionError = false
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = {
+                Text("Description")
+            },
+            placeholder = {
+                Text("Describe the media and what is known about it")
+            },
+            minLines = 4,
+            maxLines = 8,
+            isError = descriptionError,
+            supportingText = {
+                if (descriptionError) {
+                    Text("Description is required.")
+                }
+            }
+        )
+
+        Column {
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(6.dp)
+            )
+
+            OutlinedButton(
+                onClick = {
+                    categoryMenuExpanded = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = selectedCategory.displayName
+                )
             }
 
-            Text(
-                text = "CONTRIBUTE TO THE ARCHIVE",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = "Submit a case",
-                style = MaterialTheme.typography.headlineLarge
-            )
-
-            Text(
-                text = "Document a piece of media that may be lost, " +
-                        "incomplete, or difficult to find.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            OutlinedTextField(
-                value = title,
-                onValueChange = {
-                    title = it
-                    validationError = null
-                    viewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Title *") },
-                placeholder = { Text("Name of the missing media") },
-                singleLine = true
-            )
-
-            OutlinedTextField(
-                value = description,
-                onValueChange = {
-                    description = it
-                    validationError = null
-                    viewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Description *") },
-                placeholder = {
-                    Text("What is known about this case?")
-                },
-                minLines = 4
-            )
-
-            Column {
-                Text(
-                    text = "MEDIA CATEGORY",
-                    style = MaterialTheme.typography.labelMedium
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = category.displayName,
-                        modifier = Modifier.padding(vertical = 14.dp)
-                    )
-
-                    TextButton(
+            DropdownMenu(
+                expanded = categoryMenuExpanded,
+                onDismissRequest = {
+                    categoryMenuExpanded = false
+                }
+            ) {
+                MediaCategory.entries.forEach { category ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(category.displayName)
+                        },
                         onClick = {
-                            categoryMenuExpanded = true
+                            selectedCategory = category
+                            categoryMenuExpanded = false
                         }
-                    ) {
-                        Text("Change")
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = categoryMenuExpanded,
-                    onDismissRequest = {
-                        categoryMenuExpanded = false
-                    }
-                ) {
-                    MediaCategory.entries.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.displayName) },
-                            onClick = {
-                                selectedCategory = option.name
-                                categoryMenuExpanded = false
-                            }
-                        )
-                    }
+                    )
                 }
             }
+        }
 
-            OutlinedTextField(
-                value = yearText,
-                onValueChange = {
-                    yearText = it.filter(Char::isDigit).take(4)
-                    validationError = null
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Last known year (optional)") },
-                placeholder = { Text("e.g. 2004") },
-                singleLine = true
-            )
+        OutlinedTextField(
+            value = year,
+            onValueChange = { newValue ->
+                if (newValue.all { it.isDigit() } && newValue.length <= 4) {
+                    year = newValue
+                    yearError = false
+                }
 
-            OutlinedTextField(
-                value = sourceUrl,
-                onValueChange = {
-                    sourceUrl = it
-                    validationError = null
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Source URL (optional)") },
-                placeholder = { Text("https://...") },
-                singleLine = true
-            )
-
-            if (validationError != null) {
-                Text(
-                    text = validationError.orEmpty(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                if (newValue.isEmpty()) {
+                    year = ""
+                    yearError = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = {
+                Text("Last Known Year (Optional)")
+            },
+            placeholder = {
+                Text("e.g. 1998")
+            },
+            singleLine = true,
+            isError = yearError,
+            supportingText = {
+                if (yearError) {
+                    Text("Enter a valid year between 1 and 9999.")
+                }
             }
+        )
 
-            if (uiState.errorMessage != null) {
-                Text(
-                    text = uiState.errorMessage.orEmpty(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+        OutlinedTextField(
+            value = sourceUrl,
+            onValueChange = {
+                sourceUrl = it
+                urlError = false
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = {
+                Text("Source URL (Optional)")
+            },
+            placeholder = {
+                Text("https://example.com")
+            },
+            singleLine = true,
+            isError = urlError,
+            supportingText = {
+                if (urlError) {
+                    Text("URL must start with http:// or https://")
+                }
+            }
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancel")
             }
 
             Button(
                 onClick = {
-                    val parsedYear = yearText.toIntOrNull()
+                    titleError = title.isBlank()
+                    descriptionError = description.isBlank()
 
-                    when {
-                        title.isBlank() || description.isBlank() -> {
-                            validationError =
-                                "Please enter both a title and description."
-                        }
+                    yearError =
+                        year.isNotBlank() &&
+                                (
+                                        year.toIntOrNull() == null ||
+                                                year.toIntOrNull() !in 1..9999
+                                        )
 
-                        yearText.isNotBlank() &&
-                                (parsedYear == null ||
-                                        parsedYear !in 1..9999) -> {
-                            validationError =
-                                "Enter a valid year between 1 and 9999."
-                        }
-
+                    urlError =
                         sourceUrl.isNotBlank() &&
-                                !sourceUrl.trim().startsWith("https://") &&
-                                !sourceUrl.trim().startsWith("http://") -> {
-                            validationError =
-                                "The source URL must start with http:// or https://."
-                        }
+                                !sourceUrl.startsWith("http://", ignoreCase = true) &&
+                                !sourceUrl.startsWith("https://", ignoreCase = true)
 
-                        else -> {
-                            validationError = null
+                    val isValid =
+                        !titleError &&
+                                !descriptionError &&
+                                !yearError &&
+                                !urlError
 
+                    if (isValid) {
+                        val parsedYear = year.toIntOrNull()
+
+                        if (caseId == null) {
                             viewModel.addCase(
                                 title = title,
                                 description = description,
-                                category = category,
+                                category = selectedCategory,
                                 lastKnownYear = parsedYear,
                                 sourceUrl = sourceUrl
                             )
-
-                            onSubmitted()
+                        } else {
+                            viewModel.updateCase(
+                                id = caseId,
+                                title = title,
+                                description = description,
+                                category = selectedCategory,
+                                lastKnownYear = parsedYear,
+                                sourceUrl = sourceUrl
+                            )
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             ) {
-                Text("Submit to archive")
+                Text(
+                    text = if (isEditing) {
+                        "Save Changes"
+                    } else {
+                        "Submit Case"
+                    }
+                )
             }
-
-            Text(
-                text = "* Required fields",
-                style = MaterialTheme.typography.labelSmall
-            )
         }
     }
 }

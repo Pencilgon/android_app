@@ -12,10 +12,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lma.ui.components.MediaCaseCard
 import com.example.lma.viewmodel.ArchiveViewModel
 
@@ -25,7 +25,7 @@ fun WatchlistScreen(
     onCaseClick: (Int) -> Unit,
     onBack: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val bookmarkedCases = uiState.cases.filter {
         it.isBookmarked
@@ -56,7 +56,10 @@ fun WatchlistScreen(
             Text(
                 text = "${bookmarkedCases.size} saved cases",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(
+                    top = 4.dp,
+                    bottom = 16.dp
+                )
             )
 
             if (bookmarkedCases.isEmpty()) {

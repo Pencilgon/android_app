@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -18,15 +20,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.lma.model.MediaCategory
 import com.example.lma.model.RecoveryStatus
 import com.example.lma.ui.components.MediaCaseCard
@@ -39,10 +39,15 @@ fun ArchiveScreen(
     onSubmitClick: () -> Unit,
     onWatchlistClick: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var categoryMenuExpanded by remember { mutableStateOf(false) }
-    var statusMenuExpanded by remember { mutableStateOf(false) }
+    var categoryMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    var statusMenuExpanded by remember {
+        mutableStateOf(false)
+    }
 
     Scaffold(
         topBar = {
@@ -97,12 +102,53 @@ fun ArchiveScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp)
         ) {
+            Text(
+                text = "RECOVERY OVERVIEW",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatisticCard(
+                    title = "Lost",
+                    count = uiState.lostCount,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatisticCard(
+                    title = "Partial",
+                    count = uiState.partiallyFoundCount,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatisticCard(
+                    title = "Found",
+                    count = uiState.foundCount,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Text(
+                text = "${uiState.totalCases} TOTAL CASES",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = viewModel::updateSearchQuery,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search the archive") },
-                placeholder = { Text("Enter a title or keyword") },
+                label = {
+                    Text("Search the archive")
+                },
+                placeholder = {
+                    Text("Enter a title or keyword")
+                },
                 singleLine = true
             )
 
@@ -112,7 +158,9 @@ fun ArchiveScreen(
                     .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     TextButton(
                         onClick = {
                             categoryMenuExpanded = true
@@ -131,7 +179,9 @@ fun ArchiveScreen(
                         }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("All categories") },
+                            text = {
+                                Text("All categories")
+                            },
                             onClick = {
                                 viewModel.updateCategory(null)
                                 categoryMenuExpanded = false
@@ -140,7 +190,9 @@ fun ArchiveScreen(
 
                         MediaCategory.entries.forEach { category ->
                             DropdownMenuItem(
-                                text = { Text(category.displayName) },
+                                text = {
+                                    Text(category.displayName)
+                                },
                                 onClick = {
                                     viewModel.updateCategory(category)
                                     categoryMenuExpanded = false
@@ -150,7 +202,9 @@ fun ArchiveScreen(
                     }
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     TextButton(
                         onClick = {
                             statusMenuExpanded = true
@@ -169,7 +223,9 @@ fun ArchiveScreen(
                         }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("All statuses") },
+                            text = {
+                                Text("All statuses")
+                            },
                             onClick = {
                                 viewModel.updateStatusFilter(null)
                                 statusMenuExpanded = false
@@ -178,7 +234,9 @@ fun ArchiveScreen(
 
                         RecoveryStatus.entries.forEach { status ->
                             DropdownMenuItem(
-                                text = { Text(status.displayName) },
+                                text = {
+                                    Text(status.displayName)
+                                },
                                 onClick = {
                                     viewModel.updateStatusFilter(status)
                                     statusMenuExpanded = false
@@ -209,7 +267,7 @@ fun ArchiveScreen(
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -229,6 +287,35 @@ fun ArchiveScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StatisticCard(
+    title: String,
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium
+            )
         }
     }
 }

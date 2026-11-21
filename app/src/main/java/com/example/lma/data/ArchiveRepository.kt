@@ -1,86 +1,88 @@
 package com.example.lma.data
 
+import androidx.room.withTransaction
 import com.example.lma.model.MediaCase
-import com.example.lma.model.MediaCategory
+import com.example.lma.model.RecoveryEvent
 import com.example.lma.model.RecoveryStatus
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.Flow
 
-class ArchiveRepository {
+class ArchiveRepository(
+    private val database: ArchiveDatabase
+) {
 
-    private val mutex = Mutex()
+    private val dao = database.archiveDao()
 
-    private val _cases = MutableStateFlow(SampleCases.cases)
-    val cases = _cases.asStateFlow()
+    val cases: Flow<List<MediaCase>> =
+        dao.observeAllCases()
+
+    val recoveryEvents: Flow<List<RecoveryEvent>> =
+        dao.observeAllRecoveryEvents()
 
     suspend fun getCaseById(id: Int): MediaCase? {
-        return cases.value.find { it.id == id }
+        return dao.getCaseById(id)
     }
 
     suspend fun addCase(mediaCase: MediaCase) {
-        mutex.withLock {
-            _cases.update { currentCases ->
-                currentCases + mediaCase
-            }
-        }
+        dao.insertCase(mediaCase)
+    }
+
+    suspend fun updateCase(mediaCase: MediaCase) {
+        dao.updateCase(mediaCase)
+    }
+
+    suspend fun deleteCase(id: Int) {
+        dao.deleteCaseById(id)
+    }
+
+    suspend fun toggleBookmark(id: Int) {
+        dao.toggleBookmark(id)
     }
 
     suspend fun updateRecoveryStatus(
         id: Int,
-        status: RecoveryStatus
-    ) {
-        mutex.withLock {
-            _cases.update { currentCases ->
-                currentCases.map { mediaCase ->
-                    if (mediaCase.id == id) {
-                        mediaCase.copy(recoveryStatus = status)
-                    } else {
-                        mediaCase
-                    }
-                }
+        newStatus: RecoveryStatus,
+        note: String = ""
+    ): RecoveryStatusUpdateResult {
+
+        return database.withTransaction {
+
+            val currentCase = dao.getCaseById(id)
+                ?: return@withTransaction RecoveryStatusUpdateResult.CaseNotFound
+
+            val previousStatus = currentCase.recoveryStatus
+
+            if (previousStatus == newStatus) {
+                return@withTransaction RecoveryStatusUpdateResult.NoChange
             }
+
+            if (!previousStatus.canTransitionTo(newStatus)) {
+                return@withTransaction RecoveryStatusUpdateResult.InvalidTransition(
+                    currentStatus = previousStatus,
+                    requestedStatus = newStatus
+                )
+            }
+
+            dao.updateRecoveryStatus(id, newStatus)
+
+            dao.insertRecoveryEvent(
+                RecoveryEvent(
+                    mediaCaseId = id,
+                    previousStatus = previousStatus,
+                    newStatus = newStatus,
+                    note = note.trim()
+                )
+            )
+
+            RecoveryStatusUpdateResult.Success(
+                previousStatus = previousStatus,
+                newStatus = newStatus
+            )
         }
     }
 
-    suspend fun toggleBookmark(id: Int) {
-        mutex.withLock {
-            _cases.update { currentCases ->
-                currentCases.map { mediaCase ->
-                    if (mediaCase.id == id) {
-                        mediaCase.copy(
-                            isBookmarked = !mediaCase.isBookmarked
-                        )
-                    } else {
-                        mediaCase
-                    }
-                }
-            }
-        }
-    }
-
-    suspend fun searchCases(
-        query: String,
-        category: MediaCategory? = null,
-        status: RecoveryStatus? = null
-    ): List<MediaCase> {
-        delay(100)
-
-        return cases.value.filter { mediaCase ->
-            val matchesQuery =
-                mediaCase.title.contains(query, ignoreCase = true) ||
-                        mediaCase.description.contains(query, ignoreCase = true)
-
-            val matchesCategory =
-                category == null || mediaCase.category == category
-
-            val matchesStatus =
-                status == null || mediaCase.recoveryStatus == status
-
-            matchesQuery && matchesCategory && matchesStatus
-        }
+    fun observeRecoveryHistory(
+        caseId: Int
+    ): Flow<List<RecoveryEvent>> {
+        return dao.observeRecoveryHistory(caseId)
     }
 }

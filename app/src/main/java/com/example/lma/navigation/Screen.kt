@@ -13,4 +13,8 @@ sealed class Screen(val route: String) {
             return "case_details/$caseId"
         }
     }
+
+    data object EditCase : Screen("edit_case/{caseId}") {
+        fun createRoute(caseId: Int): String = "edit_case/$caseId"
+    }
 }
